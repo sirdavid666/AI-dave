@@ -8,7 +8,7 @@ workflows:
     scripts:
       - name: Create Flutter Project
         script: |
-          flutter create. --platforms=android --project-name dave_ai --org com.dave.ai
+          flutter create --platforms=android --project-name dave_ai --org com.dave.ai
       
       - name: Write main.dart
         script: |
@@ -149,10 +149,10 @@ workflows:
           cat > lib/models/message.dart << 'ENDOFCODE'
           enum MessageType { text, file }
 
-          class AIResponse {
+          class AIResult {
             final String reply;
             final String? launchedUrl;
-            AIResponse({required this.reply, this.launchedUrl});
+            AIResult(this.reply, {this.launchedUrl});
           }
 
           class ChatMessage {
@@ -172,29 +172,64 @@ workflows:
       - name: Write ai_brain.dart
         script: |
           cat > lib/ai_brain.dart << 'ENDOFCODE'
+          import 'dart:math';
+          import 'package:intl/intl.dart';
+          import 'package:url_launcher/url_launcher.dart';
           import 'models/message.dart';
 
           class AIBrain {
-            static AIResponse getAIResponse(String input) {
-              final text = input.toLowerCase();
-              if (text.contains('time')) {
-                return AIResponse(reply: "The current time is ${DateTime.now().hour}:${DateTime.now().minute}");
+            static final List<String> _jokes = [
+              "Why did the AI go to therapy? Too many bytes.",
+              "I told my computer I needed a break, now it won't stop sending me KitKats.",
+              "What do you call a robot that does laundry? A washine.",
+            ];
+
+            static AIResult getAIResponse(String rawInput) {
+              final input = rawInput.toLowerCase().trim();
+
+              if (input.isEmpty) {
+                return AIResult("I didn't catch that, boss. Try again?");
               }
-              if (text.contains('date')) {
-                return AIResponse(reply: "Today is ${DateTime.now().toLocal().toString().split(' ')[0]}");
+
+              if (input.contains("hello") || input.contains("hi")) {
+                return AIResult("Hello boss, how can I help you?");
               }
-              if (text.contains('joke')) {
-                return AIResponse(reply: "Why don't programmers like nature? Too many bugs 😂");
+
+              if (input.contains("time")) {
+                final now = DateTime.now();
+                final formatted = DateFormat('h:mm a').format(now);
+                return AIResult("The time is $formatted");
               }
-              if (text.contains('youtube')) {
-                return AIResponse(reply: "Opening YouTube for you boss", launchedUrl: "https://youtube.com");
+
+              if (input.contains("date")) {
+                final now = DateTime.now();
+                final formatted = DateFormat('EEEE, MMMM d, y').format(now);
+                return AIResult("Today is $formatted");
               }
-              return AIResponse(reply: "I heard you say: $input. I'm still learning boss.");
+
+              if (input.contains("joke")) {
+                final joke = _jokes[Random().nextInt(_jokes.length)];
+                return AIResult(joke);
+              }
+
+              if (input.contains("open youtube")) {
+                return AIResult(
+                  "Opening YouTube for you, boss.",
+                  launchedUrl: "https://youtube.com",
+                );
+              }
+
+              return AIResult(
+                "I'm offline boss. I can do time, date, jokes, and open apps.",
+              );
             }
 
             static Future<bool> launchUrlString(String url) async {
-              // Simple placeholder - real url_launcher needs more setup
-              return true;
+              final uri = Uri.parse(url);
+              if (await canLaunchUrl(uri)) {
+                return launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+              return false;
             }
           }
           ENDOFCODE
@@ -439,7 +474,7 @@ workflows:
               });
               _scrollToBottom();
 
-              final result = AIBrain.getAIResponse(text);
+              final AIResult result = AIBrain.getAIResponse(text);
 
               setState(() {
                 _messages.add(ChatMessage(text: result.reply, isUser: false));
@@ -522,26 +557,4 @@ workflows:
                   backgroundColor: const Color(0xFF0A0A0A),
                   elevation: 0,
                   title: const Text(
-                    "Dave AI",
-                    style: TextStyle(color: Color(0xFF00D4FF), fontWeight: FontWeight.bold),
-                  ),
-                ),
-                body: Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        itemCount: _messages.length,
-                        itemBuilder: (context, index) =>
-                            ChatBubble(message: _messages[index]),
-                      ),
-                    ),
-                    if (_isListening)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            _liveText.isEmpty? "Listening..." : _liveText,
-                            style: const Te
+             
