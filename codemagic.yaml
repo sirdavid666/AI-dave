@@ -4,45 +4,19 @@ workflows:
     max_build_duration: 30
     environment:
       flutter: stable
+      java: 17
     scripts:
-      - name: Organize project files into Flutter structure
+      - name: Set SDK to 36
         script: |
-          mkdir -p lib/models lib/widgets manifest_src
-          mv -f main.dart ai_brain.dart home_screen.dart chat_screen.dart lib/ 2>/dev/null || true
-          mv -f message.dart lib/models/ 2>/dev/null || true
-          mv -f "message (1).dart" lib/models/ 2>/dev/null || true
-          mv -f mic_button.dart chat_bubble.dart lib/widgets/ 2>/dev/null || true
-          mv -f AndroidManifest.xml manifest_src/ 2>/dev/null || true
-      - name: Generate Flutter platform scaffold
-        script: |
-          flutter create --platforms=android --org com.dave.ai --project-name dave_ai_voice_assistant .
-      - name: Apply custom AndroidManifest permissions
-        script: |
-          if [ -f manifest_src/AndroidManifest.xml ]; then
-            cp manifest_src/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
-          fi
-      - name: Force SDK versions (works no matter the exact generated syntax)
-        script: |
-          for f in android/app/build.gradle android/app/build.gradle.kts; do
-            if [ -f "$f" ]; then
-              echo "===== BEFORE: $f ====="
-              grep -i "sdk" "$f" || true
-
-              # Match ANY line containing these keywords and rewrite the whole line,
-              # regardless of what's on the right-hand side.
-              sed -i -E 's/^([[:space:]]*)compileSdk(Version)?.*$/\1compileSdk = 36/' "$f"
-              sed -i -E 's/^([[:space:]]*)minSdk(Version)?.*$/\1minSdk = 21/' "$f"
-              sed -i -E 's/^([[:space:]]*)targetSdk(Version)?.*$/\1targetSdk = 34/' "$f"
-
-              echo "===== AFTER: $f ====="
-              grep -i "sdk" "$f" || true
-            fi
-          done
+          # Force compileSdk 36 for all gradle files
+          find . -name "build.gradle" -exec sed -i 's/compileSdkVersion [0-9][0-9]/compileSdkVersion 36/g' {} \;
+          find . -name "build.gradle" -exec sed -i 's/targetSdkVersion [0-9][0-9]/targetSdkVersion 36/g' {} \;
       - name: Get Flutter packages
         script: |
+          flutter pub upgrade --major-versions
           flutter pub get
       - name: Build APK
         script: |
-          flutter build apk --release
+          flutter build apk --release --no-tree-shake-icons
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
