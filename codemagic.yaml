@@ -8,7 +8,7 @@ workflows:
     scripts:
       - name: Create folders
         script: |
-          mkdir -p lib lib/models lib/widgets
+          mkdir -p lib/models lib/widgets
       
       - name: Write main.dart
         script: |
@@ -20,12 +20,7 @@ workflows:
             const DaveAIApp({super.key});
             @override
             Widget build(BuildContext context) {
-              return MaterialApp(
-                title: 'Dave AI Voice Assistant',
-                debugShowCheckedModeBanner: false,
-                theme: ThemeData(useMaterial3: true, scaffoldBackgroundColor: const Color(0xFF0A0A0A), colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00D4FF), brightness: Brightness.dark, surface: const Color(0xFF0A0A0A)), appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0A0A0A), elevation: 0), fontFamily: 'Roboto'),
-                home: const HomeScreen(),
-              );
+              return MaterialApp(title: 'Dave AI Voice Assistant', debugShowCheckedModeBanner: false, theme: ThemeData(useMaterial3: true, scaffoldBackgroundColor: const Color(0xFF0A0A0A), colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00D4FF), brightness: Brightness.dark, surface: const Color(0xFF0A0A0A)), appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0A0A0A), elevation: 0), fontFamily: 'Roboto'), home: const HomeScreen());
             }
           }
           FLUTTEREOF
@@ -57,7 +52,7 @@ workflows:
           import 'dart:math'; import 'package:intl/intl.dart'; import 'package:url_launcher/url_launcher.dart'; import 'models/message.dart';
           class AIBrain { static final List<String> _jokes = ["Why did the AI go to therapy? Too many bytes.","I told my computer I needed a break, now it won't stop sending me KitKats.","What do you call a robot that does laundry? A washine."];
           static AIResult getAIResponse(String rawInput) { final input = rawInput.toLowerCase().trim(); if (input.isEmpty) { return AIResult("I didn't catch that, boss. Try again?"); } if (input.contains("hello") || input.contains("hi")) { return AIResult("Hello boss, how can I help you?"); } if (input.contains("time")) { final now = DateTime.now(); final formatted = DateFormat('h:mm a').format(now); return AIResult("The time is $formatted"); } if (input.contains("date")) { final now = DateTime.now(); final formatted = DateFormat('EEEE, MMMM d, y').format(now); return AIResult("Today is $formatted"); } if (input.contains("joke")) { final joke = _jokes[Random().nextInt(_jokes.length)]; return AIResult(joke); } if (input.contains("open youtube")) { return AIResult("Opening YouTube for you, boss.", launchedUrl: "https://youtube.com"); } return AIResult("I'm offline boss. I can do time, date, jokes, and open apps."); }
-          static Future<bool> launchUrlString(String url) async { final uri = Uri.parse(url); if (await canLaunchUrl(uri)) { return launchUrl(uri, mode: LaunchMode.externalApplication); } return false; } }
+          static Future<bool> launchUrlString(String url) async { final uri = Uri.parse(url); if (await canLaunchUrl(uri)) { return launchUrl(uri, mode: LaunchMode.externalApplication); } return false; }
           FLUTTEREOF
           cat > lib/widgets/chat_bubble.dart << 'FLUTTEREOF'
           import 'package:flutter/material.dart'; import 'package:intl/intl.dart'; import '../models/message.dart';
@@ -82,12 +77,12 @@ workflows:
           class _ChatScreenState extends State<ChatScreen> { final List<ChatMessage> _messages = []; final TextEditingController _textController = TextEditingController(); final ScrollController _scrollController = ScrollController(); final stt.SpeechToText _speech = stt.SpeechToText(); final FlutterTts _tts = FlutterTts(); bool _isListening = false; bool _speechAvailable = false; String _liveText = "";
           @override void initState() { super.initState(); _initSpeech(); _initTts(); _messages.add(ChatMessage(text: "Hey boss, I'm Dave — fully offline. Ask me the time, date, for a joke, or say 'open youtube'.", isUser: false)); if (widget.autoStartListening) { WidgetsBinding.instance.addPostFrameCallback((_) => _toggleListening()); }
           Future<void> _initSpeech() async { try { _speechAvailable = await _speech.initialize(onError: (err) => _showError("Speech error: ${err.errorMsg}"), onStatus: (status) { if (status == "done" || status == "notListening") { setState(() => _isListening = false); } }); setState(() {}); } catch (e) { _showError("Could not initialize speech recognition: $e"); } }
-          Future<void> _initTts() async { try { await _tts.setLanguage("en-US"); await _tts.setSpeechRate(0.48); await _tts.setPitch(1.0); } catch (e) { _showError("Could not initialize text-to-speech: $e"); }
+          Future<void> _initTts() async { try { await _tts.setLanguage("en-US"); await _tts.setSpeechRate(0.48); await _tts.setPitch(1.0); } catch (e) { _showError("Could not initialize text-to-speech: $e"); } }
           void _showError(String message) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.redAccent)); }
-          Future<void> _toggleListening() async { if (!_speechAvailable) { _showError("Speech recognition is not available on this device."); return; } if (_isListening) { await _speech.stop(); setState(() => _isListening = false); if (_liveText.trim().isNotEmpty) { _handleUserMessage(_liveText.trim()); } _liveText = ""; return; } try { setState(() { _isListening = true; _liveText = ""; }); await _speech.listen(onResult: (result) { setState(() => _liveText = result.recognizedWords); }); } catch (e) { setState(() => _isListening = false); _showError("Could not start listening: $e"); }
+          Future<void> _toggleListening() async { if (!_speechAvailable) { _showError("Speech recognition is not available on this device."); return; } if (_isListening) { await _speech.stop(); setState(() => _isListening = false); if (_liveText.trim().isNotEmpty) { _handleUserMessage(_liveText.trim()); } _liveText = ""; return; } try { setState(() { _isListening = true; _liveText = ""; }); await _speech.listen(onResult: (result) { setState(() => _liveText = result.recognizedWords); }); } catch (e) { setState(() => _isListening = false); _showError("Could not start listening: $e"); } }
           Future<void> _handleUserMessage(String text) async { if (text.trim().isEmpty) return; setState(() { _messages.add(ChatMessage(text: text, isUser: true)); }); _scrollToBottom(); final AIResult result = AIBrain.getAIResponse(text); setState(() { _messages.add(ChatMessage(text: result.reply, isUser: false)); }); _scrollToBottom(); _speak(result.reply); if (result.launchedUrl!= null) { final ok = await AIBrain.launchUrlString(result.launchedUrl!); if (!ok) _showError("Could not open the link."); } }
           Future<void> _speak(String text) async { try { await _tts.stop(); await _tts.speak(text); } catch (e) { _showError("Could not speak response: $e"); } }
-          Future<void> _pickFile() async { try { final result = await FilePicker.platform.pickFiles(); if (result == null || result.files.isEmpty) return; final fileName = result.files.single.name; setState(() { _messages.add(ChatMessage(text: fileName, isUser: true, type: MessageType.file)); _messages.add(ChatMessage(text: "Got it, boss. File \"$fileName\" attached.", isUser: false)); }); _scrollToBottom(); _speak("File attached."); } catch (e) { _showError("Could not pick file: $e"); }
+          Future<void> _pickFile() async { try { final result = await FilePicker.platform.pickFiles(); if (result == null || result.files.isEmpty) return; final fileName = result.files.single.name; setState(() { _messages.add(ChatMessage(text: fileName, isUser: true, type: MessageType.file)); _messages.add(ChatMessage(text: "Got it, boss. File \"$fileName\" attached.", isUser: false)); }); _scrollToBottom(); _speak("File attached."); } catch (e) { _showError("Could not pick file: $e"); } }
           void _sendTyped() { final text = _textController.text.trim(); if (text.isEmpty) return; _textController.clear(); _handleUserMessage(text); }
           void _scrollToBottom() { WidgetsBinding.instance.addPostFrameCallback((_) { if (_scrollController.hasClients) { _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: const Duration(milliseconds: 300), curve: Curves.easeOut); } }); }
           @override void dispose() { _speech.stop(); _tts.stop(); _textController.dispose(); _scrollController.dispose(); super.dispose(); }
@@ -117,11 +112,6 @@ workflows:
           flutter:
             uses-material-design: true
           FLUTTEREOF
-      
-      - name: Force SDK 36
-        script: |
-          find. -name "build.gradle" -exec sed -i 's/compileSdkVersion [0-9][0-9]/compileSdkVersion 36/g' {} \;
-          find. -name "build.gradle" -exec sed -i 's/targetSdkVersion [0-9][0-9]/targetSdkVersion 36/g' {} \;
       
       - name: Get packages
         script: |
