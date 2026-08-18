@@ -21,12 +21,23 @@ workflows:
           if [ -f manifest_src/AndroidManifest.xml ]; then
             cp manifest_src/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
           fi
-      - name: Set minSdk, targetSdk, and compileSdk
+      - name: Force SDK versions (works no matter the exact generated syntax)
         script: |
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 21/' android/app/build.gradle || true
-          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/' android/app/build.gradle || true
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' android/app/build.gradle || true
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle || true
+          for f in android/app/build.gradle android/app/build.gradle.kts; do
+            if [ -f "$f" ]; then
+              echo "===== BEFORE: $f ====="
+              grep -i "sdk" "$f" || true
+
+              # Match ANY line containing these keywords and rewrite the whole line,
+              # regardless of what's on the right-hand side.
+              sed -i -E 's/^([[:space:]]*)compileSdk(Version)?.*$/\1compileSdk = 36/' "$f"
+              sed -i -E 's/^([[:space:]]*)minSdk(Version)?.*$/\1minSdk = 21/' "$f"
+              sed -i -E 's/^([[:space:]]*)targetSdk(Version)?.*$/\1targetSdk = 34/' "$f"
+
+              echo "===== AFTER: $f ====="
+              grep -i "sdk" "$f" || true
+            fi
+          done
       - name: Get Flutter packages
         script: |
           flutter pub get
