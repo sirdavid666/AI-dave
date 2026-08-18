@@ -6,9 +6,9 @@ workflows:
       flutter: stable
       java: 17
     scripts:
-      - name: Create folders
+      - name: Create/Overwrite Flutter Project
         script: |
-          mkdir -p lib/models lib/widgets
+          flutter create --platforms=android --project-name dave_ai --org com.dave.ai --overwrite.
       
       - name: Write main.dart
         script: |
@@ -24,6 +24,10 @@ workflows:
             }
           }
           FLUTTEREOF
+      
+      - name: Create folders
+        script: |
+          mkdir -p lib/models lib/widgets
       
       - name: Write home_screen.dart
         script: |
@@ -53,6 +57,7 @@ workflows:
           class AIBrain { static final List<String> _jokes = ["Why did the AI go to therapy? Too many bytes.","I told my computer I needed a break, now it won't stop sending me KitKats.","What do you call a robot that does laundry? A washine."];
           static AIResult getAIResponse(String rawInput) { final input = rawInput.toLowerCase().trim(); if (input.isEmpty) { return AIResult("I didn't catch that, boss. Try again?"); } if (input.contains("hello") || input.contains("hi")) { return AIResult("Hello boss, how can I help you?"); } if (input.contains("time")) { final now = DateTime.now(); final formatted = DateFormat('h:mm a').format(now); return AIResult("The time is $formatted"); } if (input.contains("date")) { final now = DateTime.now(); final formatted = DateFormat('EEEE, MMMM d, y').format(now); return AIResult("Today is $formatted"); } if (input.contains("joke")) { final joke = _jokes[Random().nextInt(_jokes.length)]; return AIResult(joke); } if (input.contains("open youtube")) { return AIResult("Opening YouTube for you, boss.", launchedUrl: "https://youtube.com"); } return AIResult("I'm offline boss. I can do time, date, jokes, and open apps."); }
           static Future<bool> launchUrlString(String url) async { final uri = Uri.parse(url); if (await canLaunchUrl(uri)) { return launchUrl(uri, mode: LaunchMode.externalApplication); } return false; }
+          }
           FLUTTEREOF
           cat > lib/widgets/chat_bubble.dart << 'FLUTTEREOF'
           import 'package:flutter/material.dart'; import 'package:intl/intl.dart'; import '../models/message.dart';
@@ -61,6 +66,7 @@ workflows:
           @override void initState() { super.initState(); _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 350)); _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut); _slide = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero).animate(_fade); _controller.forward(); }
           @override void dispose() { _controller.dispose(); super.dispose(); }
           @override Widget build(BuildContext context) { final isUser = widget.message.isUser; final isFile = widget.message.type == MessageType.file; return FadeTransition(opacity: _fade, child: SlideTransition(position: _slide, child: Align(alignment: isUser? Alignment.centerRight : Alignment.centerLeft, child: Container(constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75), margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 10), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10), decoration: BoxDecoration(color: isUser? const Color(0xFF00D4FF) : const Color(0xFF1E1E1E), borderRadius: BorderRadius.only(topLeft: const Radius.circular(14), topRight: const Radius.circular(14), bottomLeft: Radius.circular(isUser? 14 : 2), bottomRight: Radius.circular(isUser? 2 : 14))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [Row(mainAxisSize: MainAxisSize.min, children: [if (isFile) Padding(padding: const EdgeInsets.only(right: 6), child: Icon(Icons.insert_drive_file, size: 18, color: isUser? Colors.black87 : Colors.white70)), Flexible(child: Text(widget.message.text, style: TextStyle(color: isUser? Colors.black87 : Colors.white, fontSize: 15)))]), const SizedBox(height: 4), Text(DateFormat('h:mm a').format(widget.message.timestamp), style: TextStyle(color: isUser? Colors.black54 : Colors.white38, fontSize: 10))]))))); }
+          }
           FLUTTEREOF
           cat > lib/widgets/mic_button.dart << 'FLUTTEREOF'
           import 'package:flutter/material.dart'; const kPrimaryColor = Color(0xFF00D4FF);
@@ -69,6 +75,7 @@ workflows:
           @override void initState() { super.initState(); _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat(reverse: true); _glow = Tween<double>(begin: 0.35, end: 1.0).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)); }
           @override void dispose() { _controller.dispose(); super.dispose(); }
           @override Widget build(BuildContext context) { return GestureDetector(onTap: widget.onTap, child: AnimatedBuilder(animation: _glow, builder: (context, child) { final glowStrength = widget.isListening? _glow.value : 0.45; return Container(width: widget.size, height: widget.size, decoration: BoxDecoration(shape: BoxShape.circle, color: const Color(0xFF111), boxShadow: [BoxShadow(color: kPrimaryColor.withOpacity(glowStrength * 0.7), blurRadius: widget.isListening? 40 : 20, spreadRadius: widget.isListening? 8 : 2)], border: Border.all(color: kPrimaryColor.withOpacity(0.8), width: 2)), child: Icon(widget.isListening? Icons.mic : Icons.mic_none, color: kPrimaryColor, size: widget.size * 0.4)); })); }
+          }
           FLUTTEREOF
           cat > lib/chat_screen.dart << 'FLUTTEREOF'
           import 'package:flutter/material.dart'; import 'package:speech_to_text/speech_to_text.dart' as stt; import 'package:flutter_tts/flutter_tts.dart'; import 'package:file_picker/file_picker.dart'; import 'ai_brain.dart'; import 'models/message.dart'; import 'widgets/chat_bubble.dart'; import 'widgets/mic_button.dart';
@@ -76,10 +83,10 @@ workflows:
           class ChatScreen extends StatefulWidget { final bool autoStartListening; const ChatScreen({super.key, this.autoStartListening = false}); @override State<ChatScreen> createState() => _ChatScreenState(); }
           class _ChatScreenState extends State<ChatScreen> { final List<ChatMessage> _messages = []; final TextEditingController _textController = TextEditingController(); final ScrollController _scrollController = ScrollController(); final stt.SpeechToText _speech = stt.SpeechToText(); final FlutterTts _tts = FlutterTts(); bool _isListening = false; bool _speechAvailable = false; String _liveText = "";
           @override void initState() { super.initState(); _initSpeech(); _initTts(); _messages.add(ChatMessage(text: "Hey boss, I'm Dave — fully offline. Ask me the time, date, for a joke, or say 'open youtube'.", isUser: false)); if (widget.autoStartListening) { WidgetsBinding.instance.addPostFrameCallback((_) => _toggleListening()); }
-          Future<void> _initSpeech() async { try { _speechAvailable = await _speech.initialize(onError: (err) => _showError("Speech error: ${err.errorMsg}"), onStatus: (status) { if (status == "done" || status == "notListening") { setState(() => _isListening = false); } }); setState(() {}); } catch (e) { _showError("Could not initialize speech recognition: $e"); } }
+          Future<void> _initSpeech() async { try { _speechAvailable = await _speech.initialize(onError: (err) => _showError("Speech error: ${err.errorMsg}"), onStatus: (status) { if (status == "done" || status == "notListening") { setState(() => _isListening = false); } }); setState(() {}); } catch (e) { _showError("Could not initialize speech recognition: $e"); }
           Future<void> _initTts() async { try { await _tts.setLanguage("en-US"); await _tts.setSpeechRate(0.48); await _tts.setPitch(1.0); } catch (e) { _showError("Could not initialize text-to-speech: $e"); } }
           void _showError(String message) { if (!mounted) return; ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.redAccent)); }
-          Future<void> _toggleListening() async { if (!_speechAvailable) { _showError("Speech recognition is not available on this device."); return; } if (_isListening) { await _speech.stop(); setState(() => _isListening = false); if (_liveText.trim().isNotEmpty) { _handleUserMessage(_liveText.trim()); } _liveText = ""; return; } try { setState(() { _isListening = true; _liveText = ""; }); await _speech.listen(onResult: (result) { setState(() => _liveText = result.recognizedWords); }); } catch (e) { setState(() => _isListening = false); _showError("Could not start listening: $e"); } }
+          Future<void> _toggleListening() async { if (!_speechAvailable) { _showError("Speech recognition is not available on this device."); return; } if (_isListening) { await _speech.stop(); setState(() => _isListening = false); if (_liveText.trim().isNotEmpty) { _handleUserMessage(_liveText.trim()); } _liveText = ""; return; } try { setState(() { _isListening = true; _liveText = ""; }); await _speech.listen(onResult: (result) { setState(() => _liveText = result.recognizedWords); }); } catch (e) { setState(() => _isListening = false); _showError("Could not start listening: $e"); }
           Future<void> _handleUserMessage(String text) async { if (text.trim().isEmpty) return; setState(() { _messages.add(ChatMessage(text: text, isUser: true)); }); _scrollToBottom(); final AIResult result = AIBrain.getAIResponse(text); setState(() { _messages.add(ChatMessage(text: result.reply, isUser: false)); }); _scrollToBottom(); _speak(result.reply); if (result.launchedUrl!= null) { final ok = await AIBrain.launchUrlString(result.launchedUrl!); if (!ok) _showError("Could not open the link."); } }
           Future<void> _speak(String text) async { try { await _tts.stop(); await _tts.speak(text); } catch (e) { _showError("Could not speak response: $e"); } }
           Future<void> _pickFile() async { try { final result = await FilePicker.platform.pickFiles(); if (result == null || result.files.isEmpty) return; final fileName = result.files.single.name; setState(() { _messages.add(ChatMessage(text: fileName, isUser: true, type: MessageType.file)); _messages.add(ChatMessage(text: "Got it, boss. File \"$fileName\" attached.", isUser: false)); }); _scrollToBottom(); _speak("File attached."); } catch (e) { _showError("Could not pick file: $e"); } }
